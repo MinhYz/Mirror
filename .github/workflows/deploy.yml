@@ -7,7 +7,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      - run: heroku update
       - run: npm install heroku@7.60.0
       - uses: akhileshns/heroku-deploy@v3.12.12
         with:
@@ -20,3 +19,9 @@ jobs:
           region: "eu"
         env:
           HD_CONFIG_FILE_URL: ${{secrets.CONFIG_FILE_URL}}
+        uses: deer42/heroku-scale-dyno@v1.0
+        with:
+          app_name: ${{secrets.HEROKU_APP_NAME}}
+          new_scale: 1
+          email: ${{secrets.HEROKU_EMAIL}}
+          api_key: ${{secrets.HEROKU_API_KEY}}
