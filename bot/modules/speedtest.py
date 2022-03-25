@@ -6,41 +6,40 @@ from bot import dispatcher
 from bot.helper.telegram_helper.bot_commands import BotCommands
 from bot.helper.telegram_helper.message_utils import sendMessage, editMessage
 
+@loader.tds
+class SpeedtestMod(loader.Module):
+    """Uses speedtest.net"""
+    strings = {"name": "Speedtest",
+               "running": "<b>Running speedtest...</b>",
+               "results": "<b>Speedtest Results:</b>",
+               "results_download": "<b>Download:</b> <code>{}</code> <b>MiB/s</b>",
+               "results_upload": "<b>Upload:</b> <code>{}</code> <b>MiB/s</b>",
+               "results_ping": "<b>Ping:</b> <code>{}</code> <b>ms</b>"}
 
-def speedtest(update, context):
-    speed = sendMessage("Running Speed Test . . . ", context.bot, update.message)
-    test = Speedtest()
-    test.get_best_server()
-    test.download()
-    test.upload()
-    test.results.share()
-    result = test.results.dict()
-    string_speed = f'''
-<b>Server</b>
-<b>Name:</b> <code>{result['server']['name']}</code>
-<b>Country:</b> <code>{result['server']['country']}, {result['server']['cc']}</code>
-<b>Sponsor:</b> <code>{result['server']['sponsor']}</code>
-<b>ISP:</b> <code>{result['client']['isp']}</code>
+    async def speedtestcmd(self, message):
+        """Tests your internet speed"""
+        await utils.answer(message, self.strings("running", message))
+        args = utils.get_args(message)
+        servers = []
+        for server in args:
+            try:
+                servers += [int(server)]
+            except ValueError:
+                logger.warning("server failed")
+        results = await utils.run_sync(self.speedtest, servers)
+        ret = self.strings("results", message) + "\n\n"
+        ret += self.strings("results_download", message).format(round(results["download"] / 2**20, 2)) + "\n"
+        ret += self.strings("results_upload", message).format(round(results["upload"] / 2**20, 2)) + "\n"
+        ret += self.strings("results_ping", message).format(round(results["ping"], 2)) + "\n"
+        await utils.answer(message, ret)
 
-<b>SpeedTest Results</b>
-<b>Upload:</b> <code>{speed_convert(result['upload'] / 8)}</code>
-<b>Download:</b>  <code>{speed_convert(result['download'] / 8)}</code>
-<b>Ping:</b> <code>{result['ping']} ms</code>
-<b>ISP Rating:</b> <code>{result['client']['isprating']}</code>
-'''
-    editMessage(string_speed, speed)
-
-
-def speed_convert(size):
-    """Hi human, you can't read bytes?"""
-    power = 2 ** 10
-    zero = 0
-    units = {0: "", 1: "Kb/s", 2: "MB/s", 3: "Gb/s", 4: "Tb/s"}
-    while size > power:
-        size /= power
-        zero += 1
-    return f"{round(size, 2)} {units[zero]}"
-
+    def speedtest(self, servers):
+        speedtester = speedtest.Speedtest()
+        speedtester.get_servers(servers)
+        speedtester.get_best_server()
+        speedtester.download(threads=None)
+        speedtester.upload(threads=None)
+        return speedtester.results.dict()
 
 SPEED_HANDLER = CommandHandler(BotCommands.SpeedCommand, speedtest,
                                                   filters=CustomFilters.owner_filter | CustomFilters.authorized_user, run_async=True)
