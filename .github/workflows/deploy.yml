@@ -16,7 +16,6 @@ jobs:
           docker_heroku_process_type: web
           stack: "container"
           region: "eu"
-          run: npm install heroku@7.60.0
         env:
           HD_CONFIG_FILE_URL: ${{secrets.CONFIG_FILE_URL}}
           
