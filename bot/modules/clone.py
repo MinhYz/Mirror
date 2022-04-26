@@ -1,6 +1,5 @@
-import random
-import string
-
+from random import SystemRandom
+from string import ascii_letters, digits
 from telegram.ext import CommandHandler
 from threading import Thread
 from time import sleep
@@ -62,12 +61,12 @@ def _clone(message, bot, multi=0):
                 msg2 = f'Failed, Clone limit is {CLONE_LIMIT}GB.\nYour File/Folder size is {get_readable_file_size(size)}.'
                 return sendMessage(msg2, bot, message)
         if multi > 1:
-            sleep(1)
+            sleep(2)
             nextmsg = type('nextmsg', (object, ), {'chat_id': message.chat_id, 'message_id': message.reply_to_message.message_id + 1})
             nextmsg = sendMessage(args[0], bot, nextmsg)
             nextmsg.from_user.id = message.from_user.id
             multi -= 1
-            sleep(1)
+            sleep(2)
             Thread(target=_clone, args=(nextmsg, bot, multi)).start()
         if files <= 20:
             msg = sendMessage(f"Cloning: <code>{link}</code>", bot, message)
@@ -75,7 +74,7 @@ def _clone(message, bot, multi=0):
             deleteMessage(bot, msg)
         else:
             drive = GoogleDriveHelper(name)
-            gid = ''.join(random.SystemRandom().choices(string.ascii_letters + string.digits, k=12))
+            gid = ''.join(SystemRandom().choices(ascii_letters + digits, k=12))
             clone_status = CloneStatus(drive, size, message, gid)
             with download_dict_lock:
                 download_dict[message.message_id] = clone_status
@@ -100,9 +99,9 @@ def _clone(message, bot, multi=0):
             sendMarkup(result + cc, bot, message, button)
         if is_gdtot:
             gd.deletefile(link)
+        LOGGER.info(f"Cloning Done: {name}")
     else:
         sendMessage('Send Gdrive or gdtot link along with command or by replying to the link by command', bot, message)
-    LOGGER.info(f"Cloning Done: {name}")
 
 @new_thread
 def cloneNode(update, context):
