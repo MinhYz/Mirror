@@ -10,7 +10,7 @@ from json import loads as jsnloads
 from subprocess import Popen, run as srun, check_output
 from time import sleep, time
 from threading import Thread, Lock
-from pyrogram import Client
+from pyrogram import Client, enums
 from dotenv import load_dotenv
 from megasdkrestclient import MegaSdkRestClient, errors as mega_err
 
@@ -114,16 +114,6 @@ AS_DOC_USERS = set()
 AS_MEDIA_USERS = set()
 EXTENTION_FILTER = set(['.torrent'])
 
-if ospath.exists('authorized_chats.txt'):
-    with open('authorized_chats.txt', 'r+') as f:
-        lines = f.readlines()
-        for line in lines:
-            AUTHORIZED_CHATS.add(int(line.split()[0]))
-if ospath.exists('sudo_users.txt'):
-    with open('sudo_users.txt', 'r+') as f:
-        lines = f.readlines()
-        for line in lines:
-            SUDO_USERS.add(int(line.split()[0]))
 try:
     aid = getConfig('AUTHORIZED_CHATS')
     aid = aid.split(' ')
@@ -140,9 +130,10 @@ except:
     pass
 try:
     fx = getConfig('EXTENTION_FILTER')
-    fx = fx.split(' ')
-    for x in fx:
-        EXTENTION_FILTER.add('.' + x)
+    if len(fx) > 0:
+        fx = fx.split(' ')
+        for x in fx:
+            EXTENTION_FILTER.add(x.lower())
 except:
     pass
 try:
@@ -161,13 +152,13 @@ except:
     exit(1)
 
 LOGGER.info("Generating BOT_STRING_SESSION")
-app = Client(name='pyrogram', api_id=int(TELEGRAM_API), api_hash=TELEGRAM_HASH, bot_token=BOT_TOKEN, no_updates=True)
+app = Client(name='pyrogram', api_id=int(TELEGRAM_API), api_hash=TELEGRAM_HASH, bot_token=BOT_TOKEN, parse_mode=enums.ParseMode.HTML, no_updates=True)
 
 try:
     USER_STRING_SESSION = getConfig('USER_STRING_SESSION')
     if len(USER_STRING_SESSION) == 0:
         raise KeyError
-    rss_session = Client(name='rss_session', api_id=int(TELEGRAM_API), api_hash=TELEGRAM_HASH, session_string=USER_STRING_SESSION)
+    rss_session = Client(name='rss_session', api_id=int(TELEGRAM_API), api_hash=TELEGRAM_HASH, session_string=USER_STRING_SESSION, parse_mode=enums.ParseMode.HTML)
 except:
     USER_STRING_SESSION = None
     rss_session = None
@@ -180,7 +171,7 @@ def aria2c_init():
         aria2.add_uris([link], {'dir': dire})
         sleep(3)
         downloads = aria2.get_downloads()
-        sleep(30)
+        sleep(20)
         for download in downloads:
             aria2.remove([download], force=True, files=True)
     except Exception as e:
@@ -354,6 +345,11 @@ try:
 except:
     BUTTON_SIX_NAME = None
     BUTTON_SIX_URL = None
+try:
+    INCOMPLETE_TASK_NOTIFIER = getConfig('INCOMPLETE_TASK_NOTIFIER')
+    INCOMPLETE_TASK_NOTIFIER = INCOMPLETE_TASK_NOTIFIER.lower() == 'true'
+except:
+    INCOMPLETE_TASK_NOTIFIER = False
 try:
     STOP_DUPLICATE = getConfig('STOP_DUPLICATE')
     STOP_DUPLICATE = STOP_DUPLICATE.lower() == 'true'
@@ -529,3 +525,4 @@ updater = tgUpdater(token=BOT_TOKEN, request_kwargs={'read_timeout': 20, 'connec
 bot = updater.bot
 dispatcher = updater.dispatcher
 job_queue = updater.job_queue
+botname = bot.username
