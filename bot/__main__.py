@@ -3,12 +3,11 @@ from os import path as ospath, remove as osremove, execl as osexecl
 from subprocess import run as srun, check_output
 from psutil import disk_usage, cpu_percent, swap_memory, cpu_count, virtual_memory, net_io_counters, boot_time
 from time import time
-from pyrogram import idle
 from sys import executable
 from telegram import InlineKeyboardMarkup
 from telegram.ext import CommandHandler
 
-from bot import bot, app, dispatcher, updater, botStartTime, IGNORE_PENDING_REQUESTS, alive, LOGGER, Interval, rss_session, INCOMPLETE_TASK_NOTIFIER, DB_URI
+from bot import bot, dispatcher, updater, botStartTime, IGNORE_PENDING_REQUESTS, LOGGER, Interval, INCOMPLETE_TASK_NOTIFIER, DB_URI, app, main_loop
 from .helper.ext_utils.fs_utils import start_cleanup, clean_all, exit_clean_up
 from .helper.ext_utils.telegraph_helper import telegraph
 from .helper.ext_utils.bot_utils import get_readable_file_size, get_readable_time
@@ -18,8 +17,7 @@ from .helper.telegram_helper.message_utils import sendMessage, sendMarkup, editM
 from .helper.telegram_helper.filters import CustomFilters
 from .helper.telegram_helper.button_build import ButtonMaker
 
-from .modules import authorize, list, cancel_mirror, mirror_status, mirror, clone, watch, shell, eval, delete, count, leech_settings, search, rss
-
+from .modules import authorize, list, cancel_mirror, mirror_status, mirror, clone, watch, shell, eval, delete, count, leech_settings, search, rss, qbselect
 
 
 def stats(update, context):
@@ -68,22 +66,22 @@ def stats(update, context):
 def start(update, context):
     buttons = ButtonMaker()
     buttons.buildbutton("Repo", "https://www.github.com/anasty17/mirror-leech-telegram-bot")
-    buttons.buildbutton("Report Group", "https://t.me/+PRRzqHd31XY3ZWZk")
+    buttons.buildbutton("Owner", "https://www.github.com/anasty17")
     reply_markup = InlineKeyboardMarkup(buttons.build_menu(2))
     if CustomFilters.authorized_user(update) or CustomFilters.authorized_chat(update):
         start_string = f'''
-This bot can mirror all your links to Google Drive!
+This bot can mirror all your links to Google Drive or to telegram!
 Type /{BotCommands.HelpCommand} to get a list of available commands
 '''
         sendMarkup(start_string, context.bot, update.message, reply_markup)
     else:
-        sendMarkup('Not Authorized user, deploy your own mirror-leech bot', context.bot, update.message, reply_markup)
+        sendMarkup('Not an Authorized user, deploy your own mirror-leech bot', context.bot, update.message, reply_markup)
 
 def restart(update, context):
     restart_message = sendMessage("Restarting...", context.bot, update.message)
     if Interval:
         Interval[0].cancel()
-    alive.kill()
+        Interval.clear()
     clean_all()
     srun(["pkill", "-f", "gunicorn|aria2c|qbittorrent-nox"])
     srun(["python3", "update.py"])
@@ -113,7 +111,7 @@ help_string_telegraph = f'''<br>
 <br><br>
 <b>/{BotCommands.UnzipMirrorCommand}</b> [download_url][magnet_link]: Start mirroring and upload the file/folder extracted from any archive extension
 <br><br>
-<b>/{BotCommands.QbMirrorCommand}</b> [magnet_link][torrent_file][torrent_file_url]: Start Mirroring using qBittorrent, Use <b>/{BotCommands.QbMirrorCommand} s</b> to select files before downloading
+<b>/{BotCommands.QbMirrorCommand}</b> [magnet_link][torrent_file][torrent_file_url]: Start Mirroring using qBittorrent, Use `<b>/{BotCommands.QbMirrorCommand} s</b>` to select files before downloading and use `<b>/{BotCommands.QbMirrorCommand} d</b>` to seed specific torrent and those two args works with all qb commands
 <br><br>
 <b>/{BotCommands.QbZipMirrorCommand}</b> [magnet_link][torrent_file][torrent_file_url]: Start mirroring using qBittorrent and upload the file/folder compressed with zip extension
 <br><br>
@@ -148,6 +146,8 @@ help_string_telegraph = f'''<br>
 <b>/{BotCommands.LeechSetCommand}</b>: Leech settings
 <br><br>
 <b>/{BotCommands.SetThumbCommand}</b>: Reply photo to set it as Thumbnail
+<br><br>
+<b>/{BotCommands.QbSelectCommand}</b>: Reply to an active /qbcmd which was used to start the qb-download or add gid along with cmd. This command mainly for selection incase you decided to select files from already added qb-torrent. But you can always use /qbcmd with arg `s` to select files before download start
 <br><br>
 <b>/{BotCommands.RssListCommand}</b>: List all subscribed rss feed info
 <br><br>
@@ -261,13 +261,19 @@ def main():
                                  bot.editMessageText(msg, chat_id, msg_id, parse_mode='HTMl', disable_web_page_preview=True)
                                  osremove(".restartmsg")
                              else:
-                                 bot.sendMessage(cid, msg, 'HTML')
+                                 try:
+                                     bot.sendMessage(cid, msg, 'HTML')
+                                 except Exception as e:
+                                     LOGGER.error(e)
                              msg = ''
                 if 'Restarted successfully!' in msg and cid == chat_id:
                      bot.editMessageText(msg, chat_id, msg_id, parse_mode='HTMl', disable_web_page_preview=True)
                      osremove(".restartmsg")
                 else:
-                    bot.sendMessage(cid, msg, 'HTML')
+                    try:
+                        bot.sendMessage(cid, msg, 'HTML')
+                    except Exception as e:
+                        LOGGER.error(e)
 
     if ospath.isfile(".restartmsg"):
         with open(".restartmsg") as f:
@@ -294,9 +300,8 @@ def main():
     updater.start_polling(drop_pending_updates=IGNORE_PENDING_REQUESTS)
     LOGGER.info("Bot Started!")
     signal(SIGINT, exit_clean_up)
-    if rss_session is not None:
-        rss_session.start()
 
 app.start()
 main()
-idle()
+
+main_loop.run_forever()
